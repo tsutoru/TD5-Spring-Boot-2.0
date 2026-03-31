@@ -1,9 +1,9 @@
 package tsutsu.td5spingboot1.repository;
 
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 import tsutsu.td5spingboot1.entity.*;
 
+import javax.sql.DataSource;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.time.Instant;
@@ -13,39 +13,45 @@ import java.util.List;
 @Repository
 public class IngredientRepository {
 
-    private final JdbcTemplate jdbcTemplate;
+    private final DataSource dataSource;
 
-    public IngredientRepository(JdbcTemplate jdbcTemplate) {
-        this.jdbcTemplate = jdbcTemplate;
+    public IngredientRepository(DataSource dataSource) {
+        this.dataSource = dataSource;
     }
 
     public List<Ingredient> findAll() {
         String sql = "SELECT id, name, price, category FROM ingredient ORDER BY id";
+        List<Ingredient> list = new ArrayList<>();
 
-        return jdbcTemplate.execute((Connection conn) -> {
-            List<Ingredient> list = new ArrayList<>();
-            try (PreparedStatement ps = conn.prepareStatement(sql);
-                 ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapRow(rs));
-                }
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                list.add(mapIngredient(rs));
             }
-            return list;
-        });
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur findAll ingredients", e);
+        }
+        return list;
     }
 
     public Ingredient findById(Integer id) {
         String sql = "SELECT id, name, price, category FROM ingredient WHERE id = ?";
 
-        return jdbcTemplate.execute((Connection conn) -> {
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, id);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (!rs.next()) return null;
-                    return mapRow(rs);
-                }
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                return mapIngredient(rs);
             }
-        });
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur findById ingredient", e);
+        }
     }
 
     public StockValue getStockValueAt(Integer ingredientId, Instant at, UnitType unit) {
@@ -63,23 +69,104 @@ public class IngredientRepository {
             GROUP BY sm.unit
         """;
 
-        return jdbcTemplate.execute((Connection conn) -> {
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, ingredientId);
-                ps.setTimestamp(2, Timestamp.from(at));
-                ps.setObject(3, unit.name(), Types.OTHER);
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        return new StockValue(
-                                rs.getDouble("actual_quantity"),
-                                UnitType.valueOf(rs.getString("unit"))
-                        );
-                    }
-                    // Aucun mouvement trouvé → stock 0
-                    return new StockValue(0.0, unit);
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, ingredientId);
+            ps.setTimestamp(2, Timestamp.from(at));
+            ps.setObject(3, unit.name(), Types.OTHER);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return new StockValue(
+                            rs.getDouble("actual_quantity"),
+                            UnitType.valueOf(rs.getString("unit"))
+                    );
+                }
+                return new StockValue(0.0, unit);
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur getStockValueAt", e);
+        }
+    }
+
+    public List<StockMovement> findStockMovementsByIngredientId(Integer ingredientId, Instant from, Instant to) {
+        String sql = """
+            SELECT id, quantity, type, unit, creation_datetime
+            FROM stock_movement
+            WHERE id_ingredient = ?
+              AND creation_datetime >= ?
+              AND creation_datetime <= ?
+            ORDER BY creation_datetime
+        """;
+        List<StockMovement> list = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, ingredientId);
+            ps.setTimestamp(2, Timestamp.from(from));
+            ps.setTimestamp(3, Timestamp.from(to));
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    StockValue value = new StockValue(
+                            rs.getBigDecimal("quantity").doubleValue(),
+                            UnitType.valueOf(rs.getString("unit"))
+                    );
+                    list.add(new StockMovement(
+                            rs.getInt("id"),
+                            ingredientId,
+                            value,
+                            MouvementType.valueOf(rs.getString("type")),
+                            rs.getTimestamp("creation_datetime").toInstant()
+                    ));
                 }
             }
-        });
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur findStockMovements", e);
+        }
+        return list;
+    }
+
+    public StockMovement saveStockMovement(Integer ingredientId, CreateStockMovement create) {
+        String sql = """
+            INSERT INTO stock_movement (id_ingredient, quantity, type, unit, creation_datetime)
+            VALUES (?, ?, ?, ?, ?)
+            RETURNING id, quantity, type, unit, creation_datetime
+        """;
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, ingredientId);
+            ps.setBigDecimal(2, BigDecimal.valueOf(create.getQuantity()));
+            ps.setObject(3, create.getType().name(), Types.OTHER);
+            ps.setObject(4, create.getUnit().name(), Types.OTHER);
+            ps.setTimestamp(5, Timestamp.from(Instant.now()));
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    StockValue value = new StockValue(
+                            rs.getBigDecimal("quantity").doubleValue(),
+                            UnitType.valueOf(rs.getString("unit"))
+                    );
+                    return new StockMovement(
+                            rs.getInt("id"),
+                            ingredientId,
+                            value,
+                            MouvementType.valueOf(rs.getString("type")),
+                            rs.getTimestamp("creation_datetime").toInstant()
+                    );
+                }
+            }
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur saveStockMovement", e);
+        }
+        return null;
     }
 
     public List<Ingredient> findByDishId(Integer dishId) {
@@ -90,22 +177,25 @@ public class IngredientRepository {
             WHERE di.id_dish = ?
             ORDER BY i.id
         """;
+        List<Ingredient> list = new ArrayList<>();
 
-        return jdbcTemplate.execute((Connection conn) -> {
-            List<Ingredient> list = new ArrayList<>();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, dishId);
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        list.add(mapRow(rs));
-                    }
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, dishId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapIngredient(rs));
                 }
             }
-            return list;
-        });
+
+        } catch (SQLException e) {
+            throw new RuntimeException("Erreur findByDishId", e);
+        }
+        return list;
     }
 
-    private Ingredient mapRow(ResultSet rs) throws SQLException {
+    private Ingredient mapIngredient(ResultSet rs) throws SQLException {
         BigDecimal p = rs.getBigDecimal("price");
         return new Ingredient(
                 rs.getInt("id"),
@@ -113,75 +203,5 @@ public class IngredientRepository {
                 p == null ? null : p.doubleValue(),
                 CategoryEnum.valueOf(rs.getString("category"))
         );
-    }
-
-    public List<StockMovement> findStockMovementsByIngredientId(Integer ingredientId, Instant from, Instant to) {
-        String sql = """
-        SELECT id, quantity, type, unit, creation_datetime
-        FROM stock_movement
-        WHERE id_ingredient = ?
-          AND creation_datetime >= ?
-          AND creation_datetime <= ?
-        ORDER BY creation_datetime
-    """;
-
-        return jdbcTemplate.execute((Connection conn) -> {
-            List<StockMovement> list = new ArrayList<>();
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, ingredientId);
-                ps.setTimestamp(2, Timestamp.from(from));
-                ps.setTimestamp(3, Timestamp.from(to));
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) {
-                        StockValue value = new StockValue(
-                                rs.getBigDecimal("quantity").doubleValue(),
-                                UnitType.valueOf(rs.getString("unit"))
-                        );
-                        list.add(new StockMovement(
-                                rs.getInt("id"),
-                                ingredientId,
-                                value,
-                                MouvementType.valueOf(rs.getString("type")),
-                                rs.getTimestamp("creation_datetime").toInstant()
-                        ));
-                    }
-                }
-            }
-            return list;
-        });
-    }
-    public StockMovement saveStockMovement(Integer ingredientId, CreateStockMovement create) {
-        String sql = """
-        INSERT INTO stock_movement (id_ingredient, quantity, type, unit, creation_datetime)
-        VALUES (?, ?, ?, ?, ?)
-        RETURNING id, quantity, type, unit, creation_datetime
-    """;
-
-        return jdbcTemplate.execute((Connection conn) -> {
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                ps.setInt(1, ingredientId);
-                ps.setBigDecimal(2, BigDecimal.valueOf(create.getQuantity()));
-                ps.setObject(3, create.getType().name(), Types.OTHER);
-                ps.setObject(4, create.getUnit().name(), Types.OTHER);
-                ps.setTimestamp(5, Timestamp.from(Instant.now()));
-
-                try (ResultSet rs = ps.executeQuery()) {
-                    if (rs.next()) {
-                        StockValue value = new StockValue(
-                                rs.getBigDecimal("quantity").doubleValue(),
-                                UnitType.valueOf(rs.getString("unit"))
-                        );
-                        return new StockMovement(
-                                rs.getInt("id"),
-                                ingredientId,
-                                value,
-                                MouvementType.valueOf(rs.getString("type")),
-                                rs.getTimestamp("creation_datetime").toInstant()
-                        );
-                    }
-                }
-            }
-            return null;
-        });
     }
 }
