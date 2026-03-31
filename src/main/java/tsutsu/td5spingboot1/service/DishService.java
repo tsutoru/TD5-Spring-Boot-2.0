@@ -7,11 +7,6 @@ import tsutsu.td5spingboot1.repository.DishRepository;
 
 import java.util.List;
 
-/**
- * Service pour la ressource Dish.
- * Contient la logique métier liée aux plats.
- * Le Controller appelle le Service, qui appelle le Repository.
- */
 @Service
 public class DishService {
 

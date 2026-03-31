@@ -9,11 +9,6 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Repository pour la ressource Dish.
- * Contient toutes les requêtes SQL liées aux plats.
- * Remplace les méthodes de plats de l'ancienne classe DataRetriever.
- */
 @Repository
 public class DishRepository {
 
