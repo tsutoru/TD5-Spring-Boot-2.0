@@ -2,9 +2,7 @@ package tsutsu.td5spingboot1.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import tsutsu.td5spingboot1.entity.Ingredient;
-import tsutsu.td5spingboot1.entity.StockValue;
-import tsutsu.td5spingboot1.entity.UnitType;
+import tsutsu.td5spingboot1.entity.*;
 import tsutsu.td5spingboot1.service.IngredientService;
 
 import java.time.Instant;
@@ -79,5 +77,60 @@ public class IngredientController {
         }
 
         return ResponseEntity.ok(stockValue);
+    }
+
+    @GetMapping("/{id}/stockMovements")
+    public ResponseEntity<?> getStockMovements(
+            @PathVariable Integer id,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to
+    ) {
+        if (from == null || to == null) {
+            return ResponseEntity
+                    .status(400)
+                    .body("Either mandatory query parameter `from` or `to` is not provided.");
+        }
+        Instant fromInstant;
+        Instant toInstant;
+        try {
+            fromInstant = Instant.parse(from);
+            toInstant   = Instant.parse(to);
+        } catch (Exception e) {
+            return ResponseEntity
+                    .status(400)
+                    .body("Les paramètres `from` et `to` doivent être au format ISO-8601, ex: 2026-01-02T12:00:00Z");
+        }
+
+        List<StockMovement> movements = ingredientService.getStockMovements(id, fromInstant, toInstant);
+
+        if (movements == null) {
+            return ResponseEntity
+                    .status(404)
+                    .body("Ingredient.id=" + id + " is not found");
+        }
+
+        return ResponseEntity.ok(movements);
+    }
+
+    @PostMapping("/{id}/stockMovements")
+    public ResponseEntity<?> addStockMovements(
+            @PathVariable Integer id,
+            @RequestBody(required = false) List<CreateStockMovement> creates
+    ) {
+        if (creates == null || creates.isEmpty()) {
+            return ResponseEntity
+                    .status(400)
+                    .body("Le corps de la requête est obligatoire et doit contenir une liste de mouvements.");
+        }
+
+        List<StockMovement> saved = ingredientService.addStockMovements(id, creates);
+
+        if (saved == null) {
+            return ResponseEntity
+                    .status(404)
+                    .body("Ingredient.id=" + id + " is not found");
+        }
+
+        return ResponseEntity.status(201).body(saved);
     }
 }

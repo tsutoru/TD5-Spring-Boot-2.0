@@ -10,11 +10,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Repository pour la ressource Ingredient.
- * Contient toutes les requêtes SQL liées aux ingrédients.
- * Remplace les méthodes d'ingrédients de l'ancienne classe DataRetriever.
- */
 @Repository
 public class IngredientRepository {
 
@@ -118,5 +113,75 @@ public class IngredientRepository {
                 p == null ? null : p.doubleValue(),
                 CategoryEnum.valueOf(rs.getString("category"))
         );
+    }
+
+    public List<StockMovement> findStockMovementsByIngredientId(Integer ingredientId, Instant from, Instant to) {
+        String sql = """
+        SELECT id, quantity, type, unit, creation_datetime
+        FROM stock_movement
+        WHERE id_ingredient = ?
+          AND creation_datetime >= ?
+          AND creation_datetime <= ?
+        ORDER BY creation_datetime
+    """;
+
+        return jdbcTemplate.execute((Connection conn) -> {
+            List<StockMovement> list = new ArrayList<>();
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, ingredientId);
+                ps.setTimestamp(2, Timestamp.from(from));
+                ps.setTimestamp(3, Timestamp.from(to));
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        StockValue value = new StockValue(
+                                rs.getBigDecimal("quantity").doubleValue(),
+                                UnitType.valueOf(rs.getString("unit"))
+                        );
+                        list.add(new StockMovement(
+                                rs.getInt("id"),
+                                ingredientId,
+                                value,
+                                MouvementType.valueOf(rs.getString("type")),
+                                rs.getTimestamp("creation_datetime").toInstant()
+                        ));
+                    }
+                }
+            }
+            return list;
+        });
+    }
+    public StockMovement saveStockMovement(Integer ingredientId, CreateStockMovement create) {
+        String sql = """
+        INSERT INTO stock_movement (id_ingredient, quantity, type, unit, creation_datetime)
+        VALUES (?, ?, ?, ?, ?)
+        RETURNING id, quantity, type, unit, creation_datetime
+    """;
+
+        return jdbcTemplate.execute((Connection conn) -> {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, ingredientId);
+                ps.setBigDecimal(2, BigDecimal.valueOf(create.getQuantity()));
+                ps.setObject(3, create.getType().name(), Types.OTHER);
+                ps.setObject(4, create.getUnit().name(), Types.OTHER);
+                ps.setTimestamp(5, Timestamp.from(Instant.now()));
+
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        StockValue value = new StockValue(
+                                rs.getBigDecimal("quantity").doubleValue(),
+                                UnitType.valueOf(rs.getString("unit"))
+                        );
+                        return new StockMovement(
+                                rs.getInt("id"),
+                                ingredientId,
+                                value,
+                                MouvementType.valueOf(rs.getString("type")),
+                                rs.getTimestamp("creation_datetime").toInstant()
+                        );
+                    }
+                }
+            }
+            return null;
+        });
     }
 }

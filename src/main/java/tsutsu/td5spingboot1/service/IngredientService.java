@@ -1,19 +1,13 @@
 package tsutsu.td5spingboot1.service;
 
 import org.springframework.stereotype.Service;
-import tsutsu.td5spingboot1.entity.Ingredient;
-import tsutsu.td5spingboot1.entity.StockValue;
-import tsutsu.td5spingboot1.entity.UnitType;
+import tsutsu.td5spingboot1.entity.*;
 import tsutsu.td5spingboot1.repository.IngredientRepository;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Service pour la ressource Ingredient.
- * Contient la logique métier liée aux ingrédients.
- * Le Controller appelle le Service, qui appelle le Repository.
- */
 @Service
 public class IngredientService {
 
@@ -35,5 +29,21 @@ public class IngredientService {
         Ingredient ingredient = ingredientRepository.findById(ingredientId);
         if (ingredient == null) return null;
         return ingredientRepository.getStockValueAt(ingredientId, at, unit);
+    }
+    public List<StockMovement> getStockMovements(Integer ingredientId, Instant from, Instant to) {
+        Ingredient ingredient = ingredientRepository.findById(ingredientId);
+        if (ingredient == null) return null;
+        return ingredientRepository.findStockMovementsByIngredientId(ingredientId, from, to);
+    }
+    public List<StockMovement> addStockMovements(Integer ingredientId, List<CreateStockMovement> creates) {
+        Ingredient ingredient = ingredientRepository.findById(ingredientId);
+        if (ingredient == null) return null;
+
+        List<StockMovement> created = new ArrayList<>();
+        for (CreateStockMovement create : creates) {
+            StockMovement saved = ingredientRepository.saveStockMovement(ingredientId, create);
+            if (saved != null) created.add(saved);
+        }
+        return created;
     }
 }
