@@ -40,7 +40,7 @@ public class DishController {
         if (updatedDish == null) {
             return ResponseEntity
                     .status(404)
-                    .body("Dish.id=" + id + " is not found");
+                    .body("Dish.id=" + id + " est introuvable");
         }
 
         return ResponseEntity.ok(updatedDish);

@@ -32,7 +32,7 @@ public class IngredientController {
         if (ingredient == null) {
             return ResponseEntity
                     .status(404)
-                    .body("Ingredient.id=" + id + " is not found");
+                    .body("Ingredient.id=" + id + " n'as pas pue etre trouver");
         }
 
         return ResponseEntity.ok(ingredient);
@@ -48,7 +48,7 @@ public class IngredientController {
         if (at == null || unit == null) {
             return ResponseEntity
                     .status(400)
-                    .body("Either mandatory query parameter `at` or `unit` is not provided.");
+                    .body("vous avez oublier les parametres `at` or `unit` .");
         }
 
         Instant instant;
@@ -73,7 +73,7 @@ public class IngredientController {
         if (stockValue == null) {
             return ResponseEntity
                     .status(404)
-                    .body("Ingredient.id=" + id + " is not found");
+                    .body("Ingredient.id=" + id + " est introuvable");
         }
 
         return ResponseEntity.ok(stockValue);
@@ -88,7 +88,7 @@ public class IngredientController {
         if (from == null || to == null) {
             return ResponseEntity
                     .status(400)
-                    .body("Either mandatory query parameter `from` or `to` is not provided.");
+                    .body("vous avez oublier les parametres `from` or `to`.");
         }
         Instant fromInstant;
         Instant toInstant;
@@ -106,7 +106,7 @@ public class IngredientController {
         if (movements == null) {
             return ResponseEntity
                     .status(404)
-                    .body("Ingredient.id=" + id + " is not found");
+                    .body("Ingredient.id=" + id + " n'as pas pue etre trouver");
         }
 
         return ResponseEntity.ok(movements);
@@ -128,7 +128,7 @@ public class IngredientController {
         if (saved == null) {
             return ResponseEntity
                     .status(404)
-                    .body("Ingredient.id=" + id + " is not found");
+                    .body("Ingredient.id=" + id + " est introuvable");
         }
 
         return ResponseEntity.status(201).body(saved);

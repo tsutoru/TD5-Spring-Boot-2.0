@@ -30,11 +30,13 @@ public class IngredientService {
         if (ingredient == null) return null;
         return ingredientRepository.getStockValueAt(ingredientId, at, unit);
     }
+
     public List<StockMovement> getStockMovements(Integer ingredientId, Instant from, Instant to) {
         Ingredient ingredient = ingredientRepository.findById(ingredientId);
         if (ingredient == null) return null;
         return ingredientRepository.findStockMovementsByIngredientId(ingredientId, from, to);
     }
+
     public List<StockMovement> addStockMovements(Integer ingredientId, List<CreateStockMovement> creates) {
         Ingredient ingredient = ingredientRepository.findById(ingredientId);
         if (ingredient == null) return null;
