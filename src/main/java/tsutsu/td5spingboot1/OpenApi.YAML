@@ -1,0 +1,233 @@
+openapi: 3.0.3
+
+info:
+  title: API Gestion des Ingrédients
+  description: API REST pour la gestion des ingrédients, plats et mouvements de stock
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Serveur local de développement
+
+paths:
+  /ingredients:
+    get:
+      summary: Retourne la liste de tous les ingrédients
+      operationId: getAllIngredients
+      responses:
+        '200':
+          description: Liste des ingrédients retournée avec succès
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ingredient'
+
+  /ingredients/{id}:
+    get:
+      summary: Retourne un ingrédient par ID
+      operationId: getIngredientById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'ingrédient
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Ingrédient retourné avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+        '404':
+          description: Ingrédient non trouvé
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Ingredient.id=1 is not found"
+
+  /ingredients/{id}/stock:
+    get:
+      summary: Retourne la valeur de stock d'un ingrédient à un instant donné
+      operationId: getIngredientStock
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID de l'ingrédient
+          schema:
+            type: integer
+        - name: at
+          in: query
+          required: true
+          description: Instant auquel récupérer la valeur du stock
+          schema:
+            type: string
+            format: date-time
+            example: "2026-01-02T12:00:00Z"
+        - name: unit
+          in: query
+          required: true
+          description: Unité du stock à récupérer
+          schema:
+            $ref: '#/components/schemas/UnitType'
+      responses:
+        '200':
+          description: Valeur de stock retournée avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockValue'
+        '400':
+          description: Paramètre obligatoire manquant
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Either mandatory query parameter `at` or `unit` is not provided."
+        '404':
+          description: Ingrédient non trouvé
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Ingredient.id=1 is not found"
+  /dishes:
+    get:
+      summary: Retourne la liste de tous les plats avec leurs ingrédients
+      operationId: getAllDishes
+      responses:
+        '200':
+          description: Liste des plats retournée avec succès
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Dish'
+
+  /dishes/{id}/ingredients:
+    put:
+      summary: Modifie la liste des ingrédients associés à un plat
+      operationId: updateDishIngredients
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant du plat
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        description: Liste des ingrédients à associer au plat
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Ingredient'
+            example:
+              - id: 1
+              - id: 2
+      responses:
+        '200':
+          description: Liste des ingrédients du plat mise à jour avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+        '400':
+          description: Corps de la requête manquant
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Le corps de la requête est obligatoire et doit contenir une liste d'ingrédients."
+        '404':
+          description: Plat non trouvé
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: "Dish.id=1 is not found"
+components:
+  schemas:
+
+    CategoryEnum:
+      type: string
+      enum:
+        - VEGETABLE
+        - ANIMAL
+        - MEAT
+        - DAIRY
+        - SWEET
+        - OTHER
+
+    UnitType:
+      type: string
+      enum:
+        - KG
+        - PCS
+        - L
+
+    MouvementType:
+      type: string
+      enum:
+        - IN
+        - OUT
+
+    DishtypeEnum:
+      type: string
+      enum:
+        - STARTER
+        - MAIN
+        - DESSERT
+
+    Ingredient:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Tomate"
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        price:
+          type: number
+          format: double
+          example: 1200.0
+
+    StockValue:
+      type: object
+      properties:
+        quantity:
+          type: number
+          format: double
+          example: 10.5
+        unit:
+          $ref: '#/components/schemas/UnitType'
+    Dish:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: "Romazava"
+        dishtype:
+          $ref: '#/components/schemas/DishtypeEnum'
+        sellingPrice:
+          type: number
+          format: double
+          example: 15000.0
+        ingredients:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ingredient'

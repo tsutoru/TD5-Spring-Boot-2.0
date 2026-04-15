@@ -1,0 +1,428 @@
+openapi: 3.0.3
+info:
+  description: "API REST pour la gestion des ingrédients, plats et mouvements de stock"
+  title: API Gestion des Ingrédients
+  version: 1.0.0
+servers:
+- description: Serveur local de développement
+  url: http://localhost:8080
+paths:
+  /ingredients:
+    get:
+      operationId: getAllIngredients
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Ingredient'
+                type: array
+          description: Liste des ingrédients retournée avec succès
+      summary: Retourne la liste de tous les ingrédients
+      x-accepts:
+      - application/json
+  /ingredients/{id}:
+    get:
+      operationId: getIngredientById
+      parameters:
+      - description: Identifiant de l'ingrédient
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingredient'
+          description: Ingrédient retourné avec succès
+        "404":
+          content:
+            text/plain:
+              schema:
+                example: Ingredient.id=1 is not found
+                type: string
+          description: Ingrédient non trouvé
+      summary: Retourne un ingrédient par son identifiant
+      x-accepts:
+      - application/json
+      - text/plain
+  /ingredients/{id}/stock:
+    get:
+      operationId: getIngredientStock
+      parameters:
+      - description: Identifiant de l'ingrédient
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Instant auquel récupérer la valeur du stock (format ISO-8601)
+        explode: true
+        in: query
+        name: at
+        required: true
+        schema:
+          example: 2026-01-02T12:00:00Z
+          format: date-time
+          type: string
+        style: form
+      - description: Unité du stock à récupérer
+        explode: true
+        in: query
+        name: unit
+        required: true
+        schema:
+          $ref: '#/components/schemas/UnitType'
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockValue'
+          description: Valeur de stock retournée avec succès
+        "400":
+          content:
+            text/plain:
+              schema:
+                example: Either mandatory query parameter `at` or `unit` is not provided.
+                type: string
+          description: Paramètre obligatoire manquant
+        "404":
+          content:
+            text/plain:
+              schema:
+                example: Ingredient.id=1 is not found
+                type: string
+          description: Ingrédient non trouvé
+      summary: Retourne la valeur de stock d'un ingrédient à un instant donné
+      x-accepts:
+      - application/json
+      - text/plain
+  /ingredients/{id}/stockMovements:
+    get:
+      operationId: getStockMovements
+      parameters:
+      - description: Identifiant de l'ingrédient
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      - description: Début de la plage de date (format ISO-8601)
+        explode: true
+        in: query
+        name: from
+        required: true
+        schema:
+          example: 2026-01-01T00:00:00Z
+          format: date-time
+          type: string
+        style: form
+      - description: Fin de la plage de date (format ISO-8601)
+        explode: true
+        in: query
+        name: to
+        required: true
+        schema:
+          example: 2026-03-31T23:59:59Z
+          format: date-time
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/StockMovement'
+                type: array
+          description: Liste des mouvements de stock retournée avec succès
+        "400":
+          content:
+            text/plain:
+              schema:
+                example: Either mandatory query parameter `from` or `to` is not provided.
+                type: string
+          description: Paramètre obligatoire manquant
+        "404":
+          content:
+            text/plain:
+              schema:
+                example: Ingredient.id=1 is not found
+                type: string
+          description: Ingrédient non trouvé
+      summary: Retourne les mouvements de stock d'un ingrédient filtrés par plage
+        de date
+      x-accepts:
+      - application/json
+      - text/plain
+    post:
+      operationId: addStockMovements
+      parameters:
+      - description: Identifiant de l'ingrédient
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            example:
+            - unit: KG
+              quantity: 5.5
+              type: IN
+            - unit: KG
+              quantity: 2.0
+              type: OUT
+            schema:
+              items:
+                $ref: '#/components/schemas/CreateStockMovement'
+              type: array
+        description: Liste des mouvements de stock à créer
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/StockMovement'
+                type: array
+          description: Mouvements de stock créés avec succès
+        "400":
+          content:
+            text/plain:
+              schema:
+                example: Le corps de la requête est obligatoire et doit contenir une
+                  liste de mouvements.
+                type: string
+          description: Corps de la requête manquant ou vide
+        "404":
+          content:
+            text/plain:
+              schema:
+                example: Ingredient.id=1 is not found
+                type: string
+          description: Ingrédient non trouvé
+      summary: Ajoute des mouvements de stock à un ingrédient
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - text/plain
+  /dishes:
+    get:
+      operationId: getAllDishes
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/Dish'
+                type: array
+          description: Liste des plats retournée avec succès
+      summary: Retourne la liste de tous les plats avec leurs ingrédients
+      x-accepts:
+      - application/json
+  /dishes/{id}/ingredients:
+    put:
+      operationId: updateDishIngredients
+      parameters:
+      - description: Identifiant du plat
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            example:
+            - id: 1
+            - id: 2
+            schema:
+              items:
+                $ref: '#/components/schemas/Ingredient'
+              type: array
+        description: Liste des ingrédients à associer au plat
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dish'
+          description: Liste des ingrédients du plat mise à jour avec succès
+        "400":
+          content:
+            text/plain:
+              schema:
+                example: Le corps de la requête est obligatoire et doit contenir une
+                  liste d'ingrédients.
+                type: string
+          description: Corps de la requête manquant
+        "404":
+          content:
+            text/plain:
+              schema:
+                example: Dish.id=1 is not found
+                type: string
+          description: Plat non trouvé
+      summary: Modifie la liste des ingrédients associés à un plat
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - text/plain
+components:
+  schemas:
+    CategoryEnum:
+      enum:
+      - VEGETABLE
+      - ANIMAL
+      - MEAT
+      - DAIRY
+      - SWEET
+      - OTHER
+      type: string
+    UnitType:
+      enum:
+      - KG
+      - PCS
+      - L
+      type: string
+    MouvementType:
+      enum:
+      - IN
+      - OUT
+      type: string
+    DishtypeEnum:
+      enum:
+      - STARTER
+      - MAIN
+      - DESSERT
+      type: string
+    Ingredient:
+      example:
+        price: 1200.0
+        name: Tomate
+        id: 1
+        category: VEGETABLE
+      properties:
+        id:
+          example: 1
+          type: integer
+        name:
+          example: Tomate
+          type: string
+        category:
+          $ref: '#/components/schemas/CategoryEnum'
+        price:
+          example: 1200.0
+          format: double
+          type: number
+      type: object
+    StockValue:
+      example:
+        unit: KG
+        quantity: 10.5
+      properties:
+        quantity:
+          example: 10.5
+          format: double
+          type: number
+        unit:
+          $ref: '#/components/schemas/UnitType'
+      type: object
+    StockMovement:
+      example:
+        unit: KG
+        quantity: 5.5
+        id: 10
+        type: IN
+        creationDatetime: 2026-01-02T12:00:00Z
+      properties:
+        id:
+          example: 10
+          type: integer
+        creationDatetime:
+          example: 2026-01-02T12:00:00Z
+          format: date-time
+          type: string
+        unit:
+          $ref: '#/components/schemas/UnitType'
+        quantity:
+          example: 5.5
+          format: double
+          type: number
+        type:
+          $ref: '#/components/schemas/MouvementType'
+      type: object
+    CreateStockMovement:
+      example:
+        unit: KG
+        quantity: 5.5
+        type: IN
+      properties:
+        unit:
+          $ref: '#/components/schemas/UnitType'
+        quantity:
+          example: 5.5
+          format: double
+          type: number
+        type:
+          $ref: '#/components/schemas/MouvementType'
+      required:
+      - quantity
+      - type
+      - unit
+      type: object
+    Dish:
+      example:
+        sellingPrice: 15000.0
+        dishtype: STARTER
+        name: Romazava
+        ingredients:
+        - price: 1200.0
+          name: Tomate
+          id: 1
+          category: VEGETABLE
+        - price: 1200.0
+          name: Tomate
+          id: 1
+          category: VEGETABLE
+        id: 1
+      properties:
+        id:
+          example: 1
+          type: integer
+        name:
+          example: Romazava
+          type: string
+        dishtype:
+          $ref: '#/components/schemas/DishtypeEnum'
+        sellingPrice:
+          example: 15000.0
+          format: double
+          type: number
+        ingredients:
+          items:
+            $ref: '#/components/schemas/Ingredient'
+          type: array
+      type: object
+
